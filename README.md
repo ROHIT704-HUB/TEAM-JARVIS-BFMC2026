@@ -1,5 +1,5 @@
 
-Md
+
 # Jarvis – BFMC 2026
 
 This repository contains the project work for the Bosch Future Mobility Challenge (BFMC) 2026.
