@@ -6,7 +6,7 @@ import time
 import os
 import psutil
 
-# Pin to CPU cores
+# Pin process to all CPU cores
 available_cores = list(range(psutil.cpu_count()))
 psutil.Process(os.getpid()).cpu_affinity(available_cores)
 
@@ -33,7 +33,7 @@ from src.utils.messages.allMessages import StateChange
 from src.statemachine.stateMachine import StateMachine
 from src.statemachine.systemMode import SystemMode
 
-# ===================== STOP SIGN IMPORTS (NEW) =====================
+# ===================== STOP SIGN MODULES =====================
 
 from src.perception.stopSignDetector import StopSignDetector
 from src.autonomy.stopSignHandler import StopSignHandler
@@ -63,7 +63,7 @@ def manage_process_life(process_class, process_instance, process_args, enabled, 
             process_instance = None
     return process_instance
 
-# ======================================== SETTING UP ====================================
+# ======================================== SETUP ====================================
 
 print(BigPrint.PLEASE_WAIT.value)
 
@@ -80,6 +80,7 @@ queueList = {
 
 logger = logging.getLogger()
 
+# Redirect stdout/stderr to log queue
 original_stdout = sys.stdout
 original_stderr = sys.stderr
 
@@ -134,7 +135,7 @@ allEvents.extend([
 # ===================== STOP SIGN INITIALIZATION =====================
 
 stop_sign_detector = StopSignDetector()
-stop_sign_handler = StopSignHandler()
+stop_sign_handler = StopSignHandler(queueList)
 
 # ===================================== START PROCESSES ==================================
 
@@ -142,12 +143,12 @@ for process in allProcesses:
     process.daemon = True
     process.start()
 
-# ===================================== STAYING ALIVE ====================================
+# ===================================== MAIN LOOP ====================================
 
 blocker = Event()
 
 try:
-    # Wait for all processes
+    # Wait for all subsystems
     for event in allEvents:
         event.wait()
 
@@ -158,11 +159,12 @@ try:
     print(BigPrint.PRESS_CTRL_C.value)
 
     while True:
-        # ===================== STOP SIGN LOGIC =====================
+
+        # ---------- STOP SIGN AUTONOMY ----------
         if stop_sign_detector.detect():
             stop_sign_handler.execute()
 
-        # ===================== BFMC STATE MACHINE ==================
+        # ---------- BFMC STATE MACHINE ----------
         message = stateChangeSubscriber.receive()
         if message is not None:
             modeDictSemaphore = SystemMode[message].value["semaphore"]["process"]
@@ -187,7 +189,7 @@ try:
         blocker.wait(0.1)
 
 except KeyboardInterrupt:
-    print("\n[MAIN] Keyboard interrupt detected. Shutting down...\n")
+    print("\n[MAIN] Keyboard interrupt received. Shutting down...\n")
 
     stop_sign_detector.release()
 
@@ -198,4 +200,3 @@ except KeyboardInterrupt:
     for proc in reversed(allProcesses):
         shutdown_process(proc)
     shutdown_process(processGateway)
-
