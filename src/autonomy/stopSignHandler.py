@@ -1,18 +1,32 @@
-Python
 import time
 
 class StopSignHandler:
     """
-    Handles stopping behavior after stop sign detection.
+    Sends REAL brake command to STM32 Nucleo using BFMC protocol.
     """
 
-    def _init_(self, stop_duration=3):
+    def __init__(self, queueList, stop_duration=3):
+        self.queueList = queueList
         self.stop_duration = stop_duration
-        self.stopped_once = False
+        self.stopped = False
 
     def execute(self):
-        if not self.stopped_once:
-            print("[AUTONOMY] Stop sign detected. Vehicle stopping.")
-            time.sleep(self.stop_duration)
-            print("[AUTONOMY] Stop completed.")
-            self.stopped_once = True
+        if self.stopped:
+            return
+
+        print("[AUTONOMY] Stop sign detected → BRAKE command sent")
+
+        # ---------------- BFMC BRAKE COMMAND ----------------
+        # Format: #brake:<steer>;;\r\n
+        brake_command = "#brake:0;;\r\n"
+
+        self.queueList["General"].put({
+            "Owner": "Autonomy",
+            "msgType": "SERIAL",
+            "msgValue": brake_command
+        })
+
+        # Hold brake for required stop duration
+        time.sleep(self.stop_duration)
+
+        self.stopped = True
